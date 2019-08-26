@@ -19,6 +19,9 @@ async function start () {
 
   const { host, port } = nuxt.options.server
 
+  app.use(express.json()) // for parsing application/json
+  app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
+
   app.use(`${prefix}/products`, productRoute);
 
   app.get('/api', function(req, res) {
