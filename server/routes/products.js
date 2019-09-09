@@ -1,14 +1,38 @@
 const express = require('express')
 const router = express.Router()
 const mongoose = require('mongoose')
+const multer = require('multer')
 
-const Product = require('./models/product')
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, './uploads/')
+    },
+    filename: function (req, file, cb) {
+        cb(null, new Date().toISOString() + file.originalname)
+    }
+});
+
+const fileFilter = (req, file, cb) => {
+    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png')
+        cb(null, true);
+    else
+        cb(null, false);
+}
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fieldSize: 1024 * 1024 * 5 //Limit Storage to 5Mb
+    }, fileFilter: fileFilter
+});
+const Product = require('../models/product')
 
 const endPoint = "http://localhost:3000/api/products"
 
 router.get('/', (req, res, next) => {
     Product.find()
-    .select('name price _id')
+        .select('name price _id productImage')
         .exec()
         .then(docs => {
             const response = {
@@ -18,7 +42,7 @@ router.get('/', (req, res, next) => {
                         ...doc._doc,
                         request: {
                             type: 'GET',
-                            url: endPoint + "/"+ doc._id
+                            url: endPoint + "/" + doc._id
                         }
                     }
                 })
@@ -37,11 +61,12 @@ router.get('/', (req, res, next) => {
 })
 
 
-router.post('/', (req, res, next) => {
+router.post('/', upload.single('productImage'), (req, res, next) => {
     const product = new Product({
         _id: new mongoose.Types.ObjectId(),
         name: req.body.name,
-        price: req.body.price
+        price: req.body.price,
+        productImage: req.file.path
     });
     product.save()
         .then(result => {
@@ -54,7 +79,7 @@ router.post('/', (req, res, next) => {
                     _id: result._id,
                     request: {
                         type: 'GET',
-                        url: endPoint + "/"+ result._id
+                        url: endPoint + "/" + result._id
                     }
                 }
             })
@@ -72,7 +97,7 @@ router.get('/:productId', (req, res, next) => {
     const id = req.params.productId;
 
     Product.findById(id)
-    .select('name price _id')
+        .select('name price _id productImage')
         .exec()
         .then(doc => {
             if (doc) {
@@ -101,18 +126,18 @@ router.patch('/:productId', (req, res, next) => {
     for (const ops of req.body) {
         updateOps[ops.propName] = ops.value
     }
-    Product.update({_id: id}, {
+    Product.update({ _id: id }, {
         $set: updateOps
-})
+    })
         .exec()
         .then(result => {
-                res.status(200).json({
-                    message: "Product Updated",
-                    request: {
-                        type: 'GET',
-                        url: `${endPoint}/${id}`
-                    }
-                })
+            res.status(200).json({
+                message: "Product Updated",
+                request: {
+                    type: 'GET',
+                    url: `${endPoint}/${id}`
+                }
+            })
         })
         .catch(err => {
             console.log(err)
@@ -124,20 +149,20 @@ router.patch('/:productId', (req, res, next) => {
 router.delete('/:productId', (req, res, next) => {
     const id = req.params.productId;
 
-    Product.deleteOne({_id: id})
+    Product.deleteOne({ _id: id })
         .exec()
         .then(result => {
-                res.status(200).json({
-                    message: "Product deleted",
-                    request: {
-                        type: 'POST',
-                        url: `${endPoint}/`,
-                        body: {
-                            name: "String",
-                            price: "Number"
-                        }
+            res.status(200).json({
+                message: "Product deleted",
+                request: {
+                    type: 'POST',
+                    url: `${endPoint}/`,
+                    body: {
+                        name: "String",
+                        price: "Number"
                     }
-                })
+                }
+            })
         })
         .catch(err => {
             console.log(err)
